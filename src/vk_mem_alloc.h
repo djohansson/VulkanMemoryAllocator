@@ -6617,6 +6617,7 @@ bool VmaBlockMetadata_Generic::CreateAllocationRequest(
 {
     VMA_ASSERT(allocSize > 0);
     VMA_ASSERT(!upperAddress);
+	(void)upperAddress;
     VMA_ASSERT(allocType != VMA_SUBALLOCATION_TYPE_FREE);
     VMA_ASSERT(pAllocationRequest != VMA_NULL);
     VMA_HEAVY_ASSERT(Validate());
@@ -6817,6 +6818,7 @@ void VmaBlockMetadata_Generic::Alloc(
     VmaAllocation hAllocation)
 {
     VMA_ASSERT(!upperAddress);
+	(void)upperAddress;
     VMA_ASSERT(request.item != m_Suballocations.end());
     VmaSuballocation& suballoc = *request.item;
     // Given suballocation is a free block.
@@ -9383,9 +9385,9 @@ VmaBlockVector::VmaBlockVector(
     m_IsCustomPool(isCustomPool),
     m_ExplicitBlockSize(explicitBlockSize),
     m_LinearAlgorithm(linearAlgorithm),
-    m_Blocks(VmaStlAllocator<VmaDeviceMemoryBlock*>(hAllocator->GetAllocationCallbacks())),
     m_HasEmptyBlock(false),
-    m_pDefragmentator(VMA_NULL),
+	m_Blocks(VmaStlAllocator<VmaDeviceMemoryBlock*>(hAllocator->GetAllocationCallbacks())),
+	m_pDefragmentator(VMA_NULL),
     m_NextBlockId(0)
 {
 }
@@ -9709,7 +9711,8 @@ VkResult VmaBlockVector::Allocate(
                     if(IsCorruptionDetectionEnabled())
                     {
                         VkResult res = pBestRequestBlock->WriteMagicValueAroundAllocation(m_hAllocator, bestRequest.offset, size);
-                        VMA_ASSERT(res == VK_SUCCESS && "Couldn't map block memory to write magic value.");
+						(void)res;
+						VMA_ASSERT(res == VK_SUCCESS && "Couldn't map block memory to write magic value.");
                     }
                     return VK_SUCCESS;
                 }
@@ -9747,6 +9750,7 @@ void VmaBlockVector::Free(
         if(IsCorruptionDetectionEnabled())
         {
             VkResult res = pBlock->ValidateMagicValueAroundAllocation(m_hAllocator, hAllocation->GetOffset(), hAllocation->GetSize());
+			(void)res;
             VMA_ASSERT(res == VK_SUCCESS && "Couldn't map block memory to validate magic value.");
         }
 
@@ -9910,6 +9914,7 @@ VkResult VmaBlockVector::AllocateFromBlock(
         if(IsCorruptionDetectionEnabled())
         {
             VkResult res = pBlock->WriteMagicValueAroundAllocation(m_hAllocator, currRequest.offset, size);
+			(void)res;
             VMA_ASSERT(res == VK_SUCCESS && "Couldn't map block memory to write magic value.");
         }
         return VK_SUCCESS;
@@ -11898,8 +11903,6 @@ bool VmaAllocator_T::TouchAllocation(VmaAllocation hAllocation)
 VkResult VmaAllocator_T::CreatePool(const VmaPoolCreateInfo* pCreateInfo, VmaPool* pPool)
 {
     VMA_DEBUG_LOG("  CreatePool: MemoryTypeIndex=%u, flags=%u", pCreateInfo->memoryTypeIndex, pCreateInfo->flags);
-
-    const bool isLinearAlgorithm = (pCreateInfo->flags & VMA_POOL_CREATE_LINEAR_ALGORITHM_BIT) != 0;
 
     VmaPoolCreateInfo newCreateInfo = *pCreateInfo;
 
