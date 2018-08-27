@@ -1071,7 +1071,7 @@ Features deliberately excluded from the scope of this library:
 
 */
 
-#include <vulkan/vulkan.h>
+#include <volk.h>
 
 /** \struct VmaAllocator
 \brief Represents main object of this library initialized.
@@ -4500,6 +4500,8 @@ private:
 
     VmaVulkanFunctions m_VulkanFunctions;
 
+	void CopyStaticVulkanFunctions();
+
     void ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunctions);
 
     VkDeviceSize CalcPreferredBlockSize(uint32_t memTypeIndex);
@@ -4873,6 +4875,7 @@ void VmaJsonWriter::WriteNull()
 
 void VmaJsonWriter::BeginValue(bool isString)
 {
+	(void)isString;
     if(!m_Stack.empty())
     {
         StackItem& currItem = m_Stack.back();
@@ -5905,7 +5908,7 @@ bool VmaBlockMetadata::CheckAllocation(
         *pOffset = suballocItem->offset;
     
         // Apply VMA_DEBUG_MARGIN at the beginning.
-        if((VMA_DEBUG_MARGIN > 0) && suballocItem != m_Suballocations.cbegin())
+        if constexpr((VMA_DEBUG_MARGIN > 0) && suballocItem != m_Suballocations.cbegin())
         {
             *pOffset += VMA_DEBUG_MARGIN;
         }
@@ -6052,7 +6055,7 @@ bool VmaBlockMetadata::CheckAllocation(
         *pOffset = suballoc.offset;
     
         // Apply VMA_DEBUG_MARGIN at the beginning.
-        if((VMA_DEBUG_MARGIN > 0) && suballocItem != m_Suballocations.cbegin())
+        if constexpr ((VMA_DEBUG_MARGIN > 0) && suballocItem != m_Suballocations.cbegin())
         {
             *pOffset += VMA_DEBUG_MARGIN;
         }
@@ -7391,6 +7394,8 @@ VmaAllocator_T::VmaAllocator_T(const VmaAllocatorCreateInfo* pCreateInfo) :
     memset(&m_pBlockVectors, 0, sizeof(m_pBlockVectors));
     memset(&m_pDedicatedAllocations, 0, sizeof(m_pDedicatedAllocations));
 
+	memset(&m_VulkanFunctions, 0, sizeof(m_VulkanFunctions));
+
     for(uint32_t i = 0; i < VK_MAX_MEMORY_HEAPS; ++i)
     {
         m_HeapSizeLimit[i] = VK_WHOLE_SIZE;
@@ -7456,35 +7461,38 @@ VmaAllocator_T::~VmaAllocator_T()
     }
 }
 
+void VmaAllocator_T::CopyStaticVulkanFunctions()
+{
+	m_VulkanFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
+	m_VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+	m_VulkanFunctions.vkAllocateMemory = vkAllocateMemory;
+	m_VulkanFunctions.vkFreeMemory = vkFreeMemory;
+	m_VulkanFunctions.vkMapMemory = vkMapMemory;
+	m_VulkanFunctions.vkUnmapMemory = vkUnmapMemory;
+	m_VulkanFunctions.vkBindBufferMemory = vkBindBufferMemory;
+	m_VulkanFunctions.vkBindImageMemory = vkBindImageMemory;
+	m_VulkanFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
+	m_VulkanFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
+	m_VulkanFunctions.vkCreateBuffer = vkCreateBuffer;
+	m_VulkanFunctions.vkDestroyBuffer = vkDestroyBuffer;
+	m_VulkanFunctions.vkCreateImage = vkCreateImage;
+	m_VulkanFunctions.vkDestroyImage = vkDestroyImage;
+	if (m_UseKhrDedicatedAllocation)
+	{
+		m_VulkanFunctions.vkGetBufferMemoryRequirements2KHR =
+			(PFN_vkGetBufferMemoryRequirements2KHR)vkGetDeviceProcAddr(m_hDevice, "vkGetBufferMemoryRequirements2KHR");
+		m_VulkanFunctions.vkGetImageMemoryRequirements2KHR =
+			(PFN_vkGetImageMemoryRequirements2KHR)vkGetDeviceProcAddr(m_hDevice, "vkGetImageMemoryRequirements2KHR");
+	}
+}
+
 void VmaAllocator_T::ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunctions)
 {
 #if VMA_STATIC_VULKAN_FUNCTIONS == 1
-    m_VulkanFunctions.vkGetPhysicalDeviceProperties = &vkGetPhysicalDeviceProperties;
-    m_VulkanFunctions.vkGetPhysicalDeviceMemoryProperties = &vkGetPhysicalDeviceMemoryProperties;
-    m_VulkanFunctions.vkAllocateMemory = &vkAllocateMemory;
-    m_VulkanFunctions.vkFreeMemory = &vkFreeMemory;
-    m_VulkanFunctions.vkMapMemory = &vkMapMemory;
-    m_VulkanFunctions.vkUnmapMemory = &vkUnmapMemory;
-    m_VulkanFunctions.vkBindBufferMemory = &vkBindBufferMemory;
-    m_VulkanFunctions.vkBindImageMemory = &vkBindImageMemory;
-    m_VulkanFunctions.vkGetBufferMemoryRequirements = &vkGetBufferMemoryRequirements;
-    m_VulkanFunctions.vkGetImageMemoryRequirements = &vkGetImageMemoryRequirements;
-    m_VulkanFunctions.vkCreateBuffer = &vkCreateBuffer;
-    m_VulkanFunctions.vkDestroyBuffer = &vkDestroyBuffer;
-    m_VulkanFunctions.vkCreateImage = &vkCreateImage;
-    m_VulkanFunctions.vkDestroyImage = &vkDestroyImage;
-    if(m_UseKhrDedicatedAllocation)
-    {
-        m_VulkanFunctions.vkGetBufferMemoryRequirements2KHR =
-            (PFN_vkGetBufferMemoryRequirements2KHR)vkGetDeviceProcAddr(m_hDevice, "vkGetBufferMemoryRequirements2KHR");
-        m_VulkanFunctions.vkGetImageMemoryRequirements2KHR =
-            (PFN_vkGetImageMemoryRequirements2KHR)vkGetDeviceProcAddr(m_hDevice, "vkGetImageMemoryRequirements2KHR");
-    }
-#endif // #if VMA_STATIC_VULKAN_FUNCTIONS == 1
-
+	CopyStaticVulkanFunctions();
+#else // #if VMA_STATIC_VULKAN_FUNCTIONS == 1
 #define VMA_COPY_IF_NOT_NULL(funcName) \
     if(pVulkanFunctions->funcName != VMA_NULL) m_VulkanFunctions.funcName = pVulkanFunctions->funcName;
-
     if(pVulkanFunctions != VMA_NULL)
     {
         VMA_COPY_IF_NOT_NULL(vkGetPhysicalDeviceProperties);
@@ -7504,8 +7512,12 @@ void VmaAllocator_T::ImportVulkanFunctions(const VmaVulkanFunctions* pVulkanFunc
         VMA_COPY_IF_NOT_NULL(vkGetBufferMemoryRequirements2KHR);
         VMA_COPY_IF_NOT_NULL(vkGetImageMemoryRequirements2KHR);
     }
-
 #undef VMA_COPY_IF_NOT_NULL
+	else
+	{
+		CopyStaticVulkanFunctions();
+	}
+#endif
 
     // If these asserts are hit, you must either #define VMA_STATIC_VULKAN_FUNCTIONS 1
     // or pass valid pointers as VmaAllocatorCreateInfo::pVulkanFunctions.
@@ -8224,6 +8236,7 @@ void VmaAllocator_T::DestroyPool(VmaPool pool)
     {
         VmaMutexLock lock(m_PoolsMutex, m_UseMutex);
         bool success = VmaVectorRemoveSorted<VmaPointerLess>(m_Pools, pool);
+		(void)success;
         VMA_ASSERT(success && "Pool not found in Allocator.");
     }
 
@@ -8414,6 +8427,7 @@ void VmaAllocator_T::FreeDedicatedMemory(VmaAllocation allocation)
         AllocationVectorType* const pDedicatedAllocations = m_pDedicatedAllocations[memTypeIndex];
         VMA_ASSERT(pDedicatedAllocations);
         bool success = VmaVectorRemoveSorted<VmaPointerLess>(*pDedicatedAllocations, allocation);
+		(void)success;
         VMA_ASSERT(success);
     }
 
