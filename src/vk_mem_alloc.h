@@ -124,6 +124,10 @@ To do it properly:
 
 It may be a good idea to create dedicated CPP file just for this purpose.
 
+Note on language: This library is written in C++, but has C-compatible interface.
+Thus you can include and use vk_mem_alloc.h in C or C++ code, but full
+implementation with `VMA_IMPLEMENTATION` macro must be compiled as C++, NOT as C.
+
 Please note that this library includes header `<vulkan/vulkan.h>`, which in turn
 includes `<windows.h>` on Windows. If you need some specific macros defined
 before including these headers (like `WIN32_LEAN_AND_MEAN` or
@@ -1452,6 +1456,10 @@ Features deliberately excluded from the scope of this library:
   explicit memory type index and dedicated allocation anyway, so they don't
   interact with main features of this library. Such special purpose allocations
   should be made manually, using `vkCreateBuffer()` and `vkAllocateMemory()`.
+- Handling CPU memory allocation failures. When dynamically creating small C++
+  objects in CPU memory (not Vulkan memory), allocation failures are not checked
+  and handled gracefully, because that would complicate code significantly and
+  is usually not needed in desktop PC applications anyway.
 - Support for any programming languages other than C/C++.
   Bindings to other languages are welcomed as external projects.
 
@@ -12531,7 +12539,7 @@ VkResult VmaAllocator_T::Defragment(
 {
     if(pAllocationsChanged != VMA_NULL)
     {
-        memset(pAllocationsChanged, 0, sizeof(*pAllocationsChanged));
+        memset(pAllocationsChanged, 0, allocationCount * sizeof(VkBool32));
     }
     if(pDefragmentationStats != VMA_NULL)
     {
